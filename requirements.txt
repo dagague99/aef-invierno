@@ -1,0 +1,8 @@
+numpy
+scipy
+pillow
+pyproj
+tifffile
+imagecodecs
+sen2sr
+mlstac
