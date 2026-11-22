@@ -111,7 +111,9 @@ if not hay('s2.npy'):
         u = f"{PC}/data/v1/item/bbox/{bx0},{by0},{bx1},{by1}/{w}x{h}.tif?collection=sentinel-2-l2a&item={f}" + ''.join('&assets=' + b for b in bandas) + f"&coord_crs=epsg:{EPSG}&dst_crs=epsg:{EPSG}&resampling={rs}"
         a = tifffile.imread(io.BytesIO(trae(u)))
         if a.ndim == 2: a = a[None]
+        elif a.shape[:2] == (h, w) and a.shape[-1] in (len(bandas), len(bandas) + 1): a = np.moveaxis(a, -1, 0)   # alto x ancho x bandas
         elif a.shape[-1] in (len(bandas), len(bandas) + 1) and a.shape[0] != len(bandas): a = np.moveaxis(a, -1, 0)
+        if a.ndim != 3 or a.shape[1:] != (h, w): raise ValueError('forma rara %s' % (a.shape,))
         return a[:len(bandas), :h, :w]
     P = 1000
     for f in ESC['items']:                                   # varias escenas del mismo paso: se rellena lo que falte
