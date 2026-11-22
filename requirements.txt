@@ -4,5 +4,7 @@ pillow
 pyproj
 tifffile
 imagecodecs
+safetensors
+matplotlib
 sen2sr
 mlstac
