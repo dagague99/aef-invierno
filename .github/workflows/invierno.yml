@@ -1,0 +1,80 @@
+name: Foto de invierno afinada
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: invierno
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matriz: ${{ steps.m.outputs.m }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: m
+        run: python3 -c "import json; c=json.load(open('cobertura.json')); print('m='+json.dumps([b['id'] for b in c['bloques']]))" >> "$GITHUB_OUTPUT"
+  bloque:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        id: ${{ fromJSON(needs.plan.outputs.matriz) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Modelo SEN2SR (se guarda entre trabajos)
+        uses: actions/cache@v4
+        with:
+          path: modelo
+          key: sen2sr-lite-rgbn-v1
+      - name: Calcular el bloque
+        env:
+          MODELO: modelo
+          CALIDAD: '82'
+          HILOS: '6'
+        run: python -u bloque.py cobertura.json ${{ matrix.id }} trabajo salida
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b-${{ matrix.id }}
+          path: salida/
+          retention-days: 30
+          compression-level: 0
+  publica:
+    needs: bloque
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy pillow
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: b-*
+          merge-multiple: true
+          path: todo
+      - name: Niveles de lejos y web
+        run: python -u piramide.py todo site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: d
+        uses: actions/deploy-pages@v4
