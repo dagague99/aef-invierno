@@ -1,8 +1,18 @@
 name: Foto de invierno afinada
 on:
   workflow_dispatch:
+    inputs:
+      solo:
+        description: 'Solo estos bloques, separados por comas (vacío = todos)'
+        required: false
+        default: ''
+      de_run:
+        description: 'Número de una ejecución anterior de la que aprovechar los bloques ya hechos (vacío = ninguna)'
+        required: false
+        default: ''
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
@@ -16,7 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: m
-        run: python3 -c "import json; c=json.load(open('cobertura.json')); print('m='+json.dumps([b['id'] for b in c['bloques']]))" >> "$GITHUB_OUTPUT"
+        env:
+          SOLO: ${{ inputs.solo }}
+        run: python3 -c "import json,os; c=json.load(open('cobertura.json')); s=[x.strip() for x in os.environ.get('SOLO','').split(',') if x.strip()]; ids=[b['id'] for b in c['bloques'] if not s or b['id'] in s]; print('m='+json.dumps(ids))" >> "$GITHUB_OUTPUT"
   bloque:
     needs: plan
     runs-on: ubuntu-latest
@@ -65,7 +77,17 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install numpy pillow
-      - uses: actions/download-artifact@v4
+      - name: Bloques de la ejecución anterior
+        if: ${{ inputs.de_run != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: b-*
+          merge-multiple: true
+          path: todo
+          run-id: ${{ inputs.de_run }}
+          github-token: ${{ github.token }}
+      - name: Bloques de esta ejecución
+        uses: actions/download-artifact@v4
         with:
           pattern: b-*
           merge-multiple: true
